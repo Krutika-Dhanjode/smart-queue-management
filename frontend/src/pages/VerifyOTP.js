@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { authAPI } from '../services/api';
 
@@ -11,7 +11,7 @@ const VerifyOTP = () => {
   const { verifyOTP } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const userId = location.state?.userId;
+  const userId = location.state?.userId || localStorage.getItem('pendingUserId');
 
   const handleChange = (index, value) => {
     if (value.length > 1) return;
@@ -35,8 +35,13 @@ const VerifyOTP = () => {
     setLoading(true);
 
     try {
-      await verifyOTP(userId, otp.join(''));
-      navigate('/admin');
+      const result = await verifyOTP(userId, otp.join(''));
+      localStorage.removeItem('pendingUserId');
+      if (result.user?.role === 'ADMIN') {
+        navigate('/admin');
+      } else {
+        navigate('/');
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Invalid OTP');
     } finally {
@@ -56,8 +61,7 @@ const VerifyOTP = () => {
   };
 
   if (!userId) {
-    navigate('/register');
-    return null;
+    return <Navigate to="/register" replace />;
   }
 
   return (

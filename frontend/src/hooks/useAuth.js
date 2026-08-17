@@ -30,7 +30,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
     connectSocket(userData.id);
-    return { emailVerified: true };
+    return { emailVerified: true, role: userData.role };
   };
 
   const register = async (data) => {

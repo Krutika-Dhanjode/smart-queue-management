@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { queueAPI, documentAPI, eligibilityAPI, analyticsAPI } from '../services/api';
+import { queueAPI, analyticsAPI } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
-import { joinQueueRoom, leaveQueueRoom, onTokenGenerated, onTokenCalled, onTokenSkipped, onTokenCompleted, onTokenRemoved, onBreakStarted, onBreakEnded, onQueueClosed } from '../services/socket';
+import { joinQueueRoom, leaveQueueRoom, getSocket } from '../services/socket';
 import QueueCreator from '../components/QueueCreator';
 import QueueMemberList from '../components/QueueMemberList';
 import CompletedList from '../components/CompletedList';
@@ -25,6 +25,10 @@ const AdminDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showBreakModal, setShowBreakModal] = useState(false);
   const [breakDuration, setBreakDuration] = useState(15);
+  const [showQR, setShowQR] = useState(false);
+  const [showAddSubQueue, setShowAddSubQueue] = useState(false);
+  const [newSubQueueName, setNewSubQueueName] = useState('');
+  const [addingSubQueue, setAddingSubQueue] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const fetchQueues = useCallback(async () => {
@@ -77,7 +81,7 @@ const AdminDashboard = () => {
   }, [selectedType]);
 
   useEffect(() => {
-    fetchQueues();
+    fetchQueues().then(() => setLoading(false));
   }, [fetchQueues]);
 
   useEffect(() => {
@@ -85,18 +89,35 @@ const AdminDashboard = () => {
       joinQueueRoom(selectedQueue.id);
       fetchMembers();
 
-      onTokenGenerated(() => fetchMembers());
-      onTokenCalled(() => fetchMembers());
-      onTokenSkipped(() => fetchMembers());
-      onTokenCompleted(() => { fetchMembers(); fetchCompleted(); });
-      onTokenRemoved(() => { fetchMembers(); fetchRejected(); });
-      onBreakStarted(() => {});
-      onBreakEnded(() => {});
-      onQueueClosed(() => {});
+      const socket = getSocket();
+      if (socket) {
+        const handleUpdate = () => fetchMembers();
+        const handleCompletedUpdate = () => { fetchMembers(); fetchCompleted(); };
+        const handleRejectedUpdate = () => { fetchMembers(); fetchRejected(); };
 
-      return () => {
-        leaveQueueRoom(selectedQueue.id);
-      };
+        socket.on('token:generated', handleUpdate);
+        socket.on('token:called', handleUpdate);
+        socket.on('token:skipped', handleRejectedUpdate);
+        socket.on('token:completed', handleCompletedUpdate);
+        socket.on('token:removed', handleRejectedUpdate);
+        socket.on('token:left', handleUpdate);
+        socket.on('queue:breakStarted', () => {});
+        socket.on('queue:breakEnded', () => {});
+        socket.on('queue:closed', () => {});
+
+        return () => {
+          leaveQueueRoom(selectedQueue.id);
+          socket.off('token:generated', handleUpdate);
+          socket.off('token:called', handleUpdate);
+          socket.off('token:skipped', handleRejectedUpdate);
+          socket.off('token:completed', handleCompletedUpdate);
+          socket.off('token:removed', handleRejectedUpdate);
+          socket.off('token:left', handleUpdate);
+          socket.off('queue:breakStarted');
+          socket.off('queue:breakEnded');
+          socket.off('queue:closed');
+        };
+      }
     }
   }, [selectedQueue, fetchMembers, fetchCompleted, fetchRejected]);
 
@@ -168,6 +189,7 @@ const AdminDashboard = () => {
     if (window.confirm('Are you sure you want to end this queue? New users will no longer be able to join.')) {
       try {
         await queueAPI.endQueue(selectedQueue.id);
+        setSelectedQueue(null);
         fetchQueues();
       } catch (err) {
         console.error('Failed to end queue');
@@ -176,8 +198,25 @@ const AdminDashboard = () => {
   };
 
   const handleQueueCreated = (newQueue) => {
-    setQueues([newQueue, ...queues]);
-    setSelectedQueue(newQueue);
+    setQueues([{ ...newQueue, adminCode: newQueue.adminCode }, ...queues]);
+  };
+
+  const handleAddSubQueue = async () => {
+    if (!newSubQueueName.trim() || !selectedQueue) return;
+    setAddingSubQueue(true);
+    try {
+      const response = await queueAPI.addSubQueue(selectedQueue.id, { name: newSubQueueName.trim() });
+      const newType = response.data.queueType;
+      const updatedTypes = [...(selectedQueue.types || []), newType];
+      setSelectedQueue({ ...selectedQueue, types: updatedTypes });
+      setQueues(queues.map(q => q.id === selectedQueue.id ? { ...q, types: updatedTypes } : q));
+      setNewSubQueueName('');
+      setShowAddSubQueue(false);
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to add sub-queue');
+    } finally {
+      setAddingSubQueue(false);
+    }
   };
 
   const tabs = [
@@ -186,6 +225,14 @@ const AdminDashboard = () => {
     { id: 'rejected', label: 'Rejected' },
     { id: 'analytics', label: 'Analytics' },
   ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -221,30 +268,89 @@ const AdminDashboard = () => {
             <div className="p-4 border-b border-gray-200">
               <h2 className="font-semibold text-gray-900">Menu</h2>
             </div>
-            <nav className="p-4 space-y-2">
-              {tabs.map((tab) => (
+            <nav className="p-4 space-y-1">
+              <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 px-3">Your Queues</div>
+              {queues.map((q) => (
                 <button
-                  key={tab.id}
-                  onClick={() => { setActiveTab(tab.id); setSidebarOpen(false); }}
+                  key={q.id}
+                  onClick={() => { setSelectedQueue(q); setSelectedType(null); setActiveTab('queue'); setSidebarOpen(false); }}
                   className={`w-full text-left px-3 py-2 rounded-lg text-sm ${
-                    activeTab === tab.id ? 'bg-gray-100 font-medium' : 'hover:bg-gray-50'
+                    selectedQueue?.id === q.id ? 'bg-gray-900 text-white font-medium' : 'hover:bg-gray-50 text-gray-700'
                   }`}
                 >
-                  {tab.label}
+                  <div className="truncate">{q.name}</div>
+                  <div className={`text-xs mt-0.5 ${selectedQueue?.id === q.id ? 'text-gray-300' : 'text-gray-500'}`}>
+                    {q.public_code} · {q.status}
+                  </div>
                 </button>
               ))}
-              <hr className="my-2" />
+              {queues.length === 0 && (
+                <div className="text-sm text-gray-500 px-3 py-2">No queues yet</div>
+              )}
+
+              <hr className="my-3" />
+
+              {selectedQueue && (
+                <>
+                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 px-3">Actions</div>
+                  {tabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => { setActiveTab(tab.id); setSidebarOpen(false); }}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm ${
+                        activeTab === tab.id ? 'bg-gray-100 font-medium' : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => { setShowAddSubQueue(true); setSidebarOpen(false); }}
+                    className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-gray-50"
+                  >
+                    + Add Sub-queue
+                  </button>
+                  <button
+                    onClick={() => { setShowQR(true); setSidebarOpen(false); }}
+                    className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-gray-50"
+                  >
+                    View QR Code
+                  </button>
+                  <button
+                    onClick={() => { setShowBreakModal(true); setSidebarOpen(false); }}
+                    className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-gray-50"
+                  >
+                    Break
+                  </button>
+                  {selectedQueue.status === 'BREAK' && (
+                    <button
+                      onClick={() => { handleEndBreak(); setSidebarOpen(false); }}
+                      className="w-full text-left px-3 py-2 rounded-lg text-sm text-green-600 hover:bg-green-50"
+                    >
+                      End Break
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { handleEndQueue(); setSidebarOpen(false); }}
+                    className="w-full text-left px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50"
+                  >
+                    End Queue
+                  </button>
+                </>
+              )}
+
+              <hr className="my-3" />
               <button
-                onClick={() => { setShowBreakModal(true); setSidebarOpen(false); }}
+                onClick={() => { setSelectedQueue(null); setSidebarOpen(false); }}
                 className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-gray-50"
               >
-                Break
+                + Create New Queue
               </button>
               <button
-                onClick={() => { handleEndQueue(); setSidebarOpen(false); }}
-                className="w-full text-left px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50"
+                onClick={() => { navigate('/'); setSidebarOpen(false); }}
+                className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-gray-50"
               >
-                End Queue
+                Home
               </button>
             </nav>
           </div>
@@ -253,7 +359,7 @@ const AdminDashboard = () => {
 
       <div className="p-4">
         {!selectedQueue ? (
-          <QueueCreator onQueueCreated={handleQueueCreated} />
+          <QueueCreator onQueueCreated={handleQueueCreated} onSelectQueue={setSelectedQueue} />
         ) : (
           <div>
             <div className="mb-6">
@@ -297,7 +403,7 @@ const AdminDashboard = () => {
               </div>
             </div>
 
-            {activeTab === 'queue' && (
+            {activeTab === 'queue' && selectedType && (
               <QueueMemberList
                 members={members}
                 onServe={handleServe}
@@ -306,6 +412,13 @@ const AdminDashboard = () => {
                 onRemove={handleRemove}
               />
             )}
+
+            {activeTab === 'queue' && !selectedType && (
+              <div className="text-center py-8 text-gray-500">
+                Select a sub-queue to view members
+              </div>
+            )}
+
             {activeTab === 'completed' && <CompletedList members={completedMembers} />}
             {activeTab === 'rejected' && <RejectedList members={rejectedMembers} />}
             {activeTab === 'analytics' && <AnalyticsPanel analytics={analytics} />}
@@ -342,6 +455,56 @@ const AdminDashboard = () => {
                 Start Break
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showAddSubQueue && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-sm mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Add Sub-queue</h3>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Service Name</label>
+              <input
+                type="text"
+                value={newSubQueueName}
+                onChange={(e) => setNewSubQueueName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddSubQueue()}
+                placeholder="e.g., OPD, Lab, Billing"
+                autoFocus
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowAddSubQueue(false); setNewSubQueueName(''); }}
+                className="flex-1 py-2 px-4 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddSubQueue}
+                disabled={!newSubQueueName.trim() || addingSubQueue}
+                className="flex-1 py-2 px-4 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 disabled:opacity-50"
+              >
+                {addingSubQueue ? 'Adding...' : 'Add'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showQR && selectedQueue && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+            <QRCodeDisplay
+              queue={{
+                publicCode: selectedQueue.public_code,
+                adminCode: selectedQueue.adminCode || 'N/A',
+                joinUrl: `${window.location.origin}/join/${selectedQueue.public_code}`,
+              }}
+              onComplete={() => setShowQR(false)}
+            />
           </div>
         </div>
       )}

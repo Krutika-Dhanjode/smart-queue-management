@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -50,8 +50,11 @@ export const queueAPI = {
   getAdminQueues: () => api.get('/queues/admin'),
   getQueue: (publicCode) => api.get(`/queues/${publicCode}`),
   getQueueWithTypes: (queueId) => api.get(`/queues/${queueId}/types`),
+  getSubQueueByCode: (subCode) => api.get(`/queues/sub/${subCode}`),
   joinQueue: (publicCode, data) => api.post(`/queues/join/${publicCode}`, data),
+  joinBySubCode: (subCode, data) => api.post(`/queues/join-sub/${subCode}`, data),
   joinByAdminCode: (data) => api.post('/queues/admin-access', data),
+  joinBySubAdminCode: (data) => api.post('/queues/sub-admin-access', data),
   getPosition: (memberId) => api.get(`/queues/member/${memberId}/position`),
   getMembersByType: (queueTypeId) => api.get(`/queues/${queueTypeId}/members`),
   serveToken: (queueTypeId, memberId) => api.post(`/queues/${queueTypeId}/members/${memberId}/serve`),
@@ -65,6 +68,11 @@ export const queueAPI = {
   getAnalytics: (queueTypeId) => api.get(`/queues/${queueTypeId}/analytics`),
   getCompletedMembers: (queueTypeId) => api.get(`/queues/${queueTypeId}/completed`),
   getRejectedMembers: (queueTypeId) => api.get(`/queues/${queueTypeId}/rejected`),
+  getPublicSubQueueInfo: (subCode) => api.get(`/queues/public/sub/${subCode}`),
+  getPublicQueueInfo: (publicCode) => api.get(`/queues/public/${publicCode}`),
+  skipSelf: (memberId, data) => api.post(`/queues/member/${memberId}/skip-self`, data),
+  getMemberStatus: (memberId) => api.get(`/queues/member/${memberId}/status`),
+  addSubQueue: (queueId, data) => api.post(`/queues/${queueId}/sub-queues`, data),
 };
 
 export const documentAPI = {

@@ -9,6 +9,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import JoinQueue from './pages/JoinQueue';
 import UserDashboard from './pages/UserDashboard';
 import AdminQueueAccess from './pages/AdminQueueAccess';
+import GetIntoQueue from './pages/GetIntoQueue';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -21,12 +22,14 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/verify-otp" element={<VerifyOTP />} />
+            <Route path="/get-into-queue" element={<GetIntoQueue />} />
             <Route path="/join/:publicCode" element={<JoinQueue />} />
+            <Route path="/join-sub/:subCode" element={<JoinQueue />} />
             <Route path="/admin-access" element={<AdminQueueAccess />} />
             <Route
               path="/admin/*"
               element={
-                <ProtectedRoute role="ADMIN">
+                <ProtectedRoute>
                   <AdminDashboard />
                 </ProtectedRoute>
               }

@@ -4,6 +4,7 @@ const QueueTypeModel = require('../models/QueueType');
 const QueueModel = require('../models/Queue');
 const QRCode = require('qrcode');
 const config = require('../config');
+const { query } = require('../config/database');
 
 class QueueController {
   async createQueue(req, res, next) {
@@ -34,6 +35,33 @@ class QueueController {
           qrCode: qrCodeDataUrl,
           types: result.types || [],
         },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async addSubQueue(req, res, next) {
+    try {
+      const { queueId } = req.params;
+      const { name, description, capacity } = req.body;
+      const QueueTypeModel = require('../models/QueueType');
+      const queue = await QueueModel.findById(queueId);
+      if (!queue) {
+        return res.status(404).json({ error: 'Organisation not found' });
+      }
+      if (queue.created_by !== req.user.id) {
+        return res.status(403).json({ error: 'Not authorized' });
+      }
+      const queueType = await QueueTypeModel.create({
+        queueId: queue.id,
+        name,
+        description,
+        capacity: capacity || queue.capacity,
+      });
+      res.status(201).json({
+        message: 'Sub-queue added successfully',
+        queueType,
       });
     } catch (error) {
       next(error);
@@ -325,7 +353,271 @@ class QueueController {
       if (!queue) {
         return res.status(404).json({ error: 'Invalid admin code' });
       }
-      res.json({ queue });
+      const queueWithTypes = await QueueModel.getQueueWithTypes(queue.id);
+      res.json({ queue: queueWithTypes });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getSubQueueByCode(req, res, next) {
+    try {
+      const { subCode } = req.params;
+      const QueueTypeModel = require('../models/QueueType');
+      const subQueue = await QueueTypeModel.findByPublicCode(subCode);
+      if (!subQueue) {
+        return res.status(404).json({ error: 'Sub-queue not found' });
+      }
+      const queue = await QueueModel.findById(subQueue.queue_id);
+      res.json({ queue, subQueue });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async joinBySubCode(req, res, next) {
+    try {
+      const { subCode } = req.params;
+      const { name, email, phone } = req.body;
+      const QueueTypeModel = require('../models/QueueType');
+      const subQueue = await QueueTypeModel.findByPublicCode(subCode);
+      if (!subQueue) {
+        return res.status(404).json({ error: 'Sub-queue not found' });
+      }
+      const queue = await QueueModel.findById(subQueue.queue_id);
+      if (!queue) {
+        return res.status(404).json({ error: 'Queue not found' });
+      }
+      if (queue.status === 'CLOSED') {
+        return res.status(400).json({ error: 'Queue is closed' });
+      }
+      if (subQueue.status !== 'OPEN') {
+        return res.status(400).json({ error: 'Sub-queue is not accepting members' });
+      }
+
+      const QueueMemberModel = require('../models/QueueMember');
+      const activeCount = await QueueMemberModel.getActiveCount(subQueue.id);
+      if (activeCount >= subQueue.capacity) {
+        return res.status(400).json({ error: 'Sub-queue is full' });
+      }
+
+      const tokenNumber = await QueueTypeModel.getNextTokenNumber(subQueue.id);
+      const member = await QueueMemberModel.create({
+        queueTypeId: subQueue.id,
+        userId: req.user?.id,
+        tokenNumber,
+        name,
+        email,
+        phone,
+      });
+
+      const io = req.app.get('io');
+      if (io) {
+        io.to(`queue:${queue.id}`).emit('token:generated', { member, queueType: subQueue });
+      }
+
+      res.status(201).json({
+        message: 'Successfully joined queue',
+        member,
+        queueType: subQueue,
+        queue,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async joinBySubAdminCode(req, res, next) {
+    try {
+      const { subCode, adminCode } = req.body;
+      const QueueTypeModel = require('../models/QueueType');
+      const subQueue = await QueueTypeModel.findByPublicCodeAndAdminCode(subCode, adminCode);
+      if (!subQueue) {
+        return res.status(404).json({ error: 'Invalid sub-queue code or admin code' });
+      }
+      const queue = await QueueModel.findById(subQueue.queue_id);
+      const queueWithTypes = await QueueModel.getQueueWithTypes(queue.id);
+      res.json({ queue: queueWithTypes, subQueue });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getPublicSubQueueInfo(req, res, next) {
+    try {
+      const { subCode } = req.params;
+      const QueueTypeModel = require('../models/QueueType');
+      const QueueMemberModel = require('../models/QueueMember');
+      const subQueue = await QueueTypeModel.findByPublicCode(subCode);
+      if (!subQueue) {
+        return res.status(404).json({ error: 'Sub-queue not found' });
+      }
+      const queue = await QueueModel.findById(subQueue.queue_id);
+      if (!queue) {
+        return res.status(404).json({ error: 'Queue not found' });
+      }
+      const activeMembers = await QueueMemberModel.findActiveByQueueType(subQueue.id);
+      const currentServing = activeMembers.find(m => m.status === 'SERVING');
+      const waitingMembers = activeMembers.filter(m => m.status === 'WAITING');
+      const peopleWaiting = waitingMembers.length;
+      const peopleAhead = currentServing ? peopleWaiting : peopleWaiting;
+      const estimatedWait = peopleWaiting * 5;
+      const docRequirements = await query(
+        'SELECT id, name, description FROM document_requirements WHERE queue_id = $1',
+        [queue.id]
+      ).catch(() => ({ rows: [] }));
+      const eligibilityCheck = await query(
+        'SELECT COUNT(*) as count FROM eligibility_records WHERE queue_id = $1',
+        [queue.id]
+      ).catch(() => ({ rows: [{ count: 0 }] }));
+      const queueTypes = await QueueTypeModel.findByQueueId(queue.id);
+      res.json({
+        queue: {
+          name: queue.name,
+          status: queue.status,
+          date: queue.date,
+        },
+        subQueue: {
+          name: subQueue.name,
+          status: subQueue.status,
+          publicCode: subQueue.public_code,
+          capacity: subQueue.capacity,
+        },
+        liveStats: {
+          currentlyServing: currentServing?.token_number || null,
+          peopleWaiting,
+          peopleAhead,
+          estimatedWaitMinutes: estimatedWait,
+          estimatedWaitRange: `${estimatedWait}-${estimatedWait + 5}`,
+        },
+        subQueues: queueTypes.map(t => ({
+          name: t.name,
+          publicCode: t.public_code,
+          status: t.status,
+        })),
+        documentRequirements: docRequirements.rows || [],
+        eligibilityEnabled: parseInt((eligibilityCheck.rows?.[0]?.count || 0)) > 0,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getPublicQueueInfo(req, res, next) {
+    try {
+      const { publicCode } = req.params;
+      const queue = await QueueModel.findByPublicCode(publicCode);
+      if (!queue) {
+        return res.status(404).json({ error: 'Queue not found' });
+      }
+      const queueTypes = await QueueTypeModel.findByQueueId(queue.id);
+      const typeStats = [];
+      for (const qt of queueTypes) {
+        const activeMembers = await QueueMemberModel.findActiveByQueueType(qt.id);
+        const currentServing = activeMembers.find(m => m.status === 'SERVING');
+        const peopleWaiting = activeMembers.filter(m => m.status === 'WAITING').length;
+        typeStats.push({
+          name: qt.name,
+          publicCode: qt.public_code,
+          status: qt.status,
+          capacity: qt.capacity,
+          currentlyServing: currentServing?.token_number || null,
+          peopleWaiting,
+          estimatedWaitMinutes: peopleWaiting * 5,
+        });
+      }
+      res.json({
+        queue: {
+          name: queue.name,
+          status: queue.status,
+          date: queue.date,
+        },
+        subQueues: typeStats,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async skipSelf(req, res, next) {
+    try {
+      const { memberId } = req.params;
+      const { targetPosition } = req.body;
+      const QueueMemberModel = require('../models/QueueMember');
+      const QueueTypeModel = require('../models/QueueType');
+      const member = await QueueMemberModel.findById(memberId);
+      if (!member) {
+        return res.status(404).json({ error: 'Member not found' });
+      }
+      if (member.status !== 'WAITING') {
+        return res.status(400).json({ error: 'Can only skip while WAITING' });
+      }
+      const position = await QueueMemberModel.getPosition(member.queue_type_id, memberId);
+      if (!targetPosition || targetPosition <= position || targetPosition > position + 10) {
+        return res.status(400).json({ error: 'Invalid target position. Can only skip forward up to 10 positions.' });
+      }
+      const allWaiting = await QueueMemberModel.getWaitingMembers(member.queue_type_id);
+      const targetIndex = allWaiting.findIndex(m => m.id === memberId);
+      const swapIndex = targetIndex + (targetPosition - position);
+      if (swapIndex >= allWaiting.length) {
+        return res.status(400).json({ error: 'Cannot skip past the last waiting person' });
+      }
+      const swapMember = allWaiting[swapIndex];
+      const tempToken = member.token_number;
+      const { query: dbQuery } = require('../config/database');
+      await dbQuery('UPDATE queue_members SET token_number = $1 WHERE id = $2', [swapMember.token_number, member.id]);
+      await dbQuery('UPDATE queue_members SET token_number = $1 WHERE id = $2', [tempToken, swapMember.id]);
+      const queueType = await QueueTypeModel.findById(member.queue_type_id);
+      const io = req.app.get('io');
+      if (io && queueType) {
+        io.to(`queue:${queueType.queue_id}`).emit('token:skipped', { member: { ...member, token_number: tempToken } });
+      }
+      res.json({ message: 'Skipped forward successfully', newPosition: targetPosition });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getMemberStatus(req, res, next) {
+    try {
+      const { memberId } = req.params;
+      const QueueMemberModel = require('../models/QueueMember');
+      const QueueTypeModel = require('../models/QueueType');
+      const member = await QueueMemberModel.findById(memberId);
+      if (!member) {
+        return res.status(404).json({ error: 'Member not found' });
+      }
+      const queueType = await QueueTypeModel.findById(member.queue_type_id);
+      const queue = await QueueModel.findById(queueType?.queue_id);
+      const activeMembers = await QueueMemberModel.findActiveByQueueType(member.queue_type_id);
+      const currentServing = activeMembers.find(m => m.status === 'SERVING');
+      const position = await QueueMemberModel.getPosition(member.queue_type_id, memberId);
+      const peopleAhead = position ? position - 1 : 0;
+      const estimatedWait = peopleAhead * 5;
+      res.json({
+        member: {
+          id: member.id,
+          token_number: member.token_number,
+          name: member.name,
+          status: member.status,
+          joined_at: member.joined_at,
+        },
+        queue: {
+          name: queue?.name,
+          status: queue?.status,
+        },
+        queueType: {
+          name: queueType?.name,
+          publicCode: queueType?.public_code,
+        },
+        liveStats: {
+          currentlyServing: currentServing?.token_number || null,
+          position: position || null,
+          peopleAhead,
+          estimatedWaitMinutes: estimatedWait,
+          estimatedWaitRange: `${estimatedWait}-${estimatedWait + 5}`,
+        },
+      });
     } catch (error) {
       next(error);
     }

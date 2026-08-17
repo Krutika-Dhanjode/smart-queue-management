@@ -18,9 +18,13 @@ const Login = () => {
     try {
       const result = await login(email, password);
       if (result.emailVerified === false) {
-        navigate('/verify-otp', { state: { userId: result.userId } });
-      } else {
+        setError('Please verify your email first. Check your inbox for the OTP code, then register again.');
+        setLoading(false);
+        return;
+      } else if (result.role === 'ADMIN') {
         navigate('/admin');
+      } else {
+        navigate('/');
       }
     } catch (err) {
       setError(err.response?.data?.error || 'Login failed');

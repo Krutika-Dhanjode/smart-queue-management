@@ -29,6 +29,7 @@ class AuthService {
 
     const otp = this.generateOTP();
     await OTPModel.create(user.id, otp);
+    console.log(`[OTP] ${email} => ${otp}`);
 
     if (config.nodeEnv !== 'test') {
       await this.sendOTPEmail(email, otp, name);
@@ -138,7 +139,7 @@ class AuthService {
     try {
       await this.transporter.sendMail(mailOptions);
     } catch (error) {
-      console.error('Failed to send OTP email:', error);
+      console.error('Failed to send OTP email:', error.message);
     }
   }
 }

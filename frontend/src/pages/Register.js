@@ -36,6 +36,7 @@ const Register = () => {
         phone: formData.phone,
         password: formData.password,
       });
+      localStorage.setItem('pendingUserId', result.userId);
       navigate('/verify-otp', { state: { userId: result.userId } });
     } catch (err) {
       setError(err.response?.data?.error || 'Registration failed');

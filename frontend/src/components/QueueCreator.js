@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { queueAPI } from '../services/api';
 import QRCodeDisplay from './QRCodeDisplay';
 
-const QueueCreator = ({ onQueueCreated }) => {
+const QueueCreator = ({ onQueueCreated, onSelectQueue }) => {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     name: '',
@@ -49,14 +49,18 @@ const QueueCreator = ({ onQueueCreated }) => {
 
   if (step === 3 && createdQueue) {
     return (
-      <QRCodeDisplay queue={createdQueue} onComplete={() => setStep(1)} />
+      <QRCodeDisplay
+        queue={createdQueue}
+        onComplete={() => { setStep(1); setCreatedQueue(null); }}
+        onGoToAdmin={() => onSelectQueue(createdQueue)}
+      />
     );
   }
 
   return (
     <div className="max-w-lg mx-auto">
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-6">Create New Queue</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-6">Create New Organisation</h2>
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4 text-sm">
@@ -67,12 +71,12 @@ const QueueCreator = ({ onQueueCreated }) => {
         {step === 1 && (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Queue Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Organisation Name</label>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g., Hospital OPD"
+                placeholder="e.g., Smart Hospital, City Clinic"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900"
               />
             </div>
@@ -102,7 +106,7 @@ const QueueCreator = ({ onQueueCreated }) => {
               disabled={!formData.name}
               className="w-full py-2 px-4 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 disabled:opacity-50"
             >
-              Next: Add Sub-queues
+              Next: Add Services
             </button>
           </div>
         )}
@@ -115,7 +119,7 @@ const QueueCreator = ({ onQueueCreated }) => {
                 value={newSubQueue}
                 onChange={(e) => setNewSubQueue(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAddSubQueue()}
-                placeholder="Sub-queue name"
+                placeholder="Service name (e.g., OPD, Lab, Billing)"
                 className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900"
               />
               <button
@@ -156,7 +160,7 @@ const QueueCreator = ({ onQueueCreated }) => {
                 disabled={loading}
                 className="flex-1 py-2 px-4 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 disabled:opacity-50"
               >
-                {loading ? 'Creating...' : 'Create Queue'}
+                {loading ? 'Creating...' : 'Create Organisation'}
               </button>
             </div>
           </div>
