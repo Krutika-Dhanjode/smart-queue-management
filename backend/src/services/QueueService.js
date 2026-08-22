@@ -3,11 +3,12 @@ const QueueTypeModel = require('../models/QueueType');
 const QueueMemberModel = require('../models/QueueMember');
 const QueueEventModel = require('../models/QueueEvent');
 const NotificationModel = require('../models/Notification');
+const QueueSettings = require('../models/QueueSettings');
 const { getRedis } = require('../config/redis');
 const { query } = require('../config/database');
 
 class QueueService {
-  async createQueue({ name, date, capacity, createdBy, subQueues }) {
+  async createQueue({ name, date, capacity, createdBy, subQueues, settings, customFields }) {
     const adminCode = this.generateAdminCode();
     const queue = await QueueModel.create({
       name,
@@ -26,6 +27,15 @@ class QueueService {
           capacity: subQueue.capacity || capacity,
         });
       }
+    }
+
+    if (settings) {
+      await QueueSettings.createOrUpdate(queue.id, settings);
+    }
+
+    if (customFields && customFields.length > 0) {
+      const QueueCustomField = require('../models/QueueCustomField');
+      await QueueCustomField.bulkCreate(queue.id, customFields);
     }
 
     const types = await QueueTypeModel.findByQueueId(queue.id);
@@ -58,7 +68,7 @@ class QueueService {
     return QueueModel.findByCreatedBy(adminId);
   }
 
-  async joinQueue({ publicCode, queueTypeId, name, email, phone, userId, priority }) {
+  async joinQueue({ publicCode, queueTypeId, name, email, phone, userId, priority, customData, skipChecks }) {
     const queue = await QueueModel.findByPublicCode(publicCode);
     if (!queue) {
       throw new Error('Queue not found');
@@ -79,6 +89,29 @@ class QueueService {
 
     if (queueType.status !== 'OPEN') {
       throw new Error('Sub-queue is not accepting members');
+    }
+
+    if (!skipChecks) {
+      const settings = await QueueSettings.findByQueueId(queue.id);
+
+      if (settings) {
+        const scheduleCheck = await QueueSettings.checkSchedule(queue.id);
+        if (!scheduleCheck.open) {
+          throw new Error(scheduleCheck.message);
+        }
+
+        const entryOk = await QueueSettings.checkEntryLimit(queue.id);
+        if (!entryOk) {
+          throw new Error('Queue capacity has been reached.');
+        }
+
+        if (settings.eligibility_enabled) {
+          const match = await QueueSettings.checkEligibility(queue.id, { name, email, phone, student_id: customData?.student_id });
+          if (!match) {
+            throw new Error(settings.error_message || 'You are not eligible to join this queue.');
+          }
+        }
+      }
     }
 
     if (userId) {
@@ -104,6 +137,10 @@ class QueueService {
       phone,
       priority,
     });
+
+    if (customData) {
+      await query('UPDATE queue_members SET custom_data = $1 WHERE id = $2', [JSON.stringify(customData), member.id]);
+    }
 
     await QueueEventModel.create({
       queueId: queue.id,

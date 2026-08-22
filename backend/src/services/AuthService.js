@@ -68,9 +68,7 @@ class AuthService {
       const otp = this.generateOTP();
       await OTPModel.invalidatePrevious(user.id);
       await OTPModel.create(user.id, otp);
-      if (config.nodeEnv !== 'test') {
-        await this.sendOTPEmail(user.email, otp, user.name);
-      }
+      console.log(`[OTP] ${email} => ${otp}`);
       return { user, emailVerified: false, otpSent: true };
     }
 

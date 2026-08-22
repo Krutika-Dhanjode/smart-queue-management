@@ -67,7 +67,15 @@ class QueueModel {
        ORDER BY q.created_at DESC`,
       [userId]
     );
-    return result.rows;
+    const queues = result.rows;
+    for (const queue of queues) {
+      const typesResult = await query(
+        'SELECT * FROM queue_types WHERE queue_id = $1 ORDER BY created_at',
+        [queue.id]
+      );
+      queue.types = typesResult.rows;
+    }
+    return queues;
   }
 
   static async updateStatus(id, status) {

@@ -113,6 +113,14 @@ class QueueMemberModel {
     return parseInt(result.rows[0].count);
   }
 
+  static async undoServe(id) {
+    const result = await query(
+      `UPDATE queue_members SET status = 'WAITING', served_at = NULL, serving_at = NULL, waiting_duration = NULL, service_duration = NULL, updated_at = NOW() WHERE id = $1 AND status = 'SERVED' RETURNING *`,
+      [id]
+    );
+    return result.rows[0];
+  }
+
   static async getSkippedCount(queueTypeId) {
     const result = await query(
       `SELECT COUNT(*) as count

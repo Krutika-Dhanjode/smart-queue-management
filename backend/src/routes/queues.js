@@ -24,6 +24,7 @@ router.get('/:queueTypeId/members', QueueController.getMembersByType);
 
 router.post('/:queueTypeId/members/:memberId/serve', authenticate, QueueController.serveToken);
 router.post('/:queueTypeId/members/:memberId/complete', authenticate, QueueController.completeToken);
+router.post('/:queueTypeId/members/:memberId/undo-serve', authenticate, QueueController.undoServe);
 router.post('/:queueTypeId/members/:memberId/skip', authenticate, QueueController.skipToken);
 router.post('/:queueTypeId/members/:memberId/remove', authenticate, QueueController.removeToken);
 router.post('/member/:memberId/leave', QueueController.leaveQueue);

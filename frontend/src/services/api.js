@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+const API_URL = process.env.REACT_APP_API_URL || `http://${window.location.hostname}:5002/api`;
 
 const api = axios.create({
   baseURL: API_URL,
@@ -60,6 +60,7 @@ export const queueAPI = {
   serveToken: (queueTypeId, memberId) => api.post(`/queues/${queueTypeId}/members/${memberId}/serve`),
   completeToken: (queueTypeId, memberId) => api.post(`/queues/${queueTypeId}/members/${memberId}/complete`),
   skipToken: (queueTypeId, memberId) => api.post(`/queues/${queueTypeId}/members/${memberId}/skip`),
+  undoServe: (queueTypeId, memberId) => api.post(`/queues/${queueTypeId}/members/${memberId}/undo-serve`),
   removeToken: (queueTypeId, memberId) => api.post(`/queues/${queueTypeId}/members/${memberId}/remove`),
   leaveQueue: (memberId) => api.post(`/queues/member/${memberId}/leave`),
   startBreak: (queueId, data) => api.post(`/queues/${queueId}/break`, data),
@@ -73,6 +74,24 @@ export const queueAPI = {
   skipSelf: (memberId, data) => api.post(`/queues/member/${memberId}/skip-self`, data),
   getMemberStatus: (memberId) => api.get(`/queues/member/${memberId}/status`),
   addSubQueue: (queueId, data) => api.post(`/queues/${queueId}/sub-queues`, data),
+};
+
+export const queueSettingsAPI = {
+  getSettings: (queueId) => api.get(`/queue-settings/${queueId}/settings`),
+  updateSettings: (queueId, data) => api.put(`/queue-settings/${queueId}/settings`, data),
+  getCustomFields: (queueId) => api.get(`/queue-settings/${queueId}/custom-fields`),
+  addCustomField: (queueId, data) => api.post(`/queue-settings/${queueId}/custom-fields`, data),
+  updateCustomField: (fieldId, data) => api.put(`/queue-settings/custom-fields/${fieldId}`, data),
+  deleteCustomField: (fieldId) => api.delete(`/queue-settings/custom-fields/${fieldId}`),
+  bulkCreateCustomFields: (queueId, fields) => api.post(`/queue-settings/${queueId}/custom-fields/bulk`, { fields }),
+  uploadEligibility: (queueId, formData) => api.post(`/queue-settings/${queueId}/eligibility/upload`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  getEligibilityInfo: (queueId) => api.get(`/queue-settings/${queueId}/eligibility/info`),
+  removeEligibility: (queueId) => api.delete(`/queue-settings/${queueId}/eligibility`),
+  checkEligibility: (queueId, data) => api.post(`/queue-settings/${queueId}/eligibility/check`, data),
+  addDocRequirement: (queueId, formData) => api.post(`/queue-settings/${queueId}/doc-requirements`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  updateDocRequirement: (requirementId, formData) => api.put(`/queue-settings/doc-requirements/${requirementId}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  deleteDocRequirement: (requirementId) => api.delete(`/queue-settings/doc-requirements/${requirementId}`),
+  checkJoinRequirements: (queueId, data) => api.post(`/queue-settings/${queueId}/check-join`, data),
 };
 
 export const documentAPI = {

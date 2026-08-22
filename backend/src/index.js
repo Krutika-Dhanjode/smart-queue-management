@@ -17,7 +17,19 @@ app.set('io', io);
 
 app.use(helmet());
 app.use(cors({
-  origin: config.frontend.url,
+  origin: function(origin, callback) {
+    if (!origin) return callback(null, true);
+    const allowed = [
+      config.frontend.url,
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+    ];
+    if (allowed.indexOf(origin) !== -1 || origin.match(/http:\/\/\d+\.\d+\.\d+\.\d+:3000/)) {
+      callback(null, true);
+    } else {
+      callback(null, true);
+    }
+  },
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -41,6 +53,7 @@ app.use('/api/auth/', authLimiter);
 
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/queues', require('./routes/queues'));
+app.use('/api/queue-settings', require('./routes/queueSettings'));
 app.use('/api/documents', require('./routes/documents'));
 app.use('/api/eligibility', require('./routes/eligibility'));
 app.use('/api/analytics', require('./routes/analytics'));

@@ -9,13 +9,15 @@ const { query } = require('../config/database');
 class QueueController {
   async createQueue(req, res, next) {
     try {
-      const { name, date, capacity, subQueues } = req.body;
+      const { name, date, capacity, subQueues, settings, customFields } = req.body;
       const result = await QueueService.createQueue({
         name,
         date,
         capacity,
         createdBy: req.user.id,
         subQueues,
+        settings,
+        customFields,
       });
 
       const joinUrl = `${config.frontend.url}/join/${result.public_code}`;
@@ -378,7 +380,7 @@ class QueueController {
   async joinBySubCode(req, res, next) {
     try {
       const { subCode } = req.params;
-      const { name, email, phone } = req.body;
+      const { name, email, phone, customData, student_id } = req.body;
       const QueueTypeModel = require('../models/QueueType');
       const subQueue = await QueueTypeModel.findByPublicCode(subCode);
       if (!subQueue) {
@@ -388,41 +390,30 @@ class QueueController {
       if (!queue) {
         return res.status(404).json({ error: 'Queue not found' });
       }
-      if (queue.status === 'CLOSED') {
-        return res.status(400).json({ error: 'Queue is closed' });
-      }
-      if (subQueue.status !== 'OPEN') {
-        return res.status(400).json({ error: 'Sub-queue is not accepting members' });
-      }
 
-      const QueueMemberModel = require('../models/QueueMember');
-      const activeCount = await QueueMemberModel.getActiveCount(subQueue.id);
-      if (activeCount >= subQueue.capacity) {
-        return res.status(400).json({ error: 'Sub-queue is full' });
-      }
-
-      const tokenNumber = await QueueTypeModel.getNextTokenNumber(subQueue.id);
-      const member = await QueueMemberModel.create({
+      const result = await QueueService.joinQueue({
+        publicCode: queue.public_code,
         queueTypeId: subQueue.id,
+        name, email, phone,
         userId: req.user?.id,
-        tokenNumber,
-        name,
-        email,
-        phone,
+        customData: customData || (student_id ? { student_id } : undefined),
       });
 
       const io = req.app.get('io');
       if (io) {
-        io.to(`queue:${queue.id}`).emit('token:generated', { member, queueType: subQueue });
+        io.to(`queue:${queue.id}`).emit('token:generated', { member: result.member, queueType: result.queueType });
       }
 
       res.status(201).json({
         message: 'Successfully joined queue',
-        member,
-        queueType: subQueue,
-        queue,
+        member: result.member,
+        queueType: result.queueType,
+        queue: result.queue,
       });
     } catch (error) {
+      if (error.message === 'Queue is closed' || error.message === 'Queue capacity has been reached.' || error.message === 'You are not eligible to join this queue.' || error.message === 'Queue is not open yet.' || error.message === 'This queue is closed.') {
+        return res.status(400).json({ error: error.message });
+      }
       next(error);
     }
   }
@@ -471,6 +462,8 @@ class QueueController {
         [queue.id]
       ).catch(() => ({ rows: [{ count: 0 }] }));
       const queueTypes = await QueueTypeModel.findByQueueId(queue.id);
+      const QueueSettingsModel = require('../models/QueueSettings');
+      const settings = await QueueSettingsModel.findByQueueId(queue.id);
       res.json({
         queue: {
           name: queue.name,
@@ -497,6 +490,12 @@ class QueueController {
         })),
         documentRequirements: docRequirements.rows || [],
         eligibilityEnabled: parseInt((eligibilityCheck.rows?.[0]?.count || 0)) > 0,
+        settings: settings ? {
+          welcome_message: settings.welcome_message,
+          error_message: settings.error_message,
+          eligibility_enabled: settings.eligibility_enabled,
+          documents_required: settings.documents_required,
+        } : null,
       });
     } catch (error) {
       next(error);
@@ -517,6 +516,7 @@ class QueueController {
         const currentServing = activeMembers.find(m => m.status === 'SERVING');
         const peopleWaiting = activeMembers.filter(m => m.status === 'WAITING').length;
         typeStats.push({
+          id: qt.id,
           name: qt.name,
           publicCode: qt.public_code,
           status: qt.status,
@@ -563,16 +563,38 @@ class QueueController {
         return res.status(400).json({ error: 'Cannot skip past the last waiting person' });
       }
       const swapMember = allWaiting[swapIndex];
-      const tempToken = member.token_number;
+      const memberOriginalToken = member.token_number;
+      const swapOriginalToken = swapMember.token_number;
       const { query: dbQuery } = require('../config/database');
-      await dbQuery('UPDATE queue_members SET token_number = $1 WHERE id = $2', [swapMember.token_number, member.id]);
-      await dbQuery('UPDATE queue_members SET token_number = $1 WHERE id = $2', [tempToken, swapMember.id]);
+      await dbQuery('UPDATE queue_members SET token_number = $1 WHERE id = $2', [-999999, member.id]);
+      await dbQuery('UPDATE queue_members SET token_number = $1 WHERE id = $2', [memberOriginalToken, swapMember.id]);
+      await dbQuery('UPDATE queue_members SET token_number = $1 WHERE id = $2', [swapOriginalToken, member.id]);
       const queueType = await QueueTypeModel.findById(member.queue_type_id);
       const io = req.app.get('io');
       if (io && queueType) {
         io.to(`queue:${queueType.queue_id}`).emit('token:skipped', { member: { ...member, token_number: tempToken } });
       }
       res.json({ message: 'Skipped forward successfully', newPosition: targetPosition });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async undoServe(req, res, next) {
+    try {
+      const { queueTypeId, memberId } = req.params;
+      const member = await QueueMemberModel.undoServe(memberId);
+      if (!member) {
+        return res.status(400).json({ error: 'Cannot undo - member not in SERVED status' });
+      }
+
+      const io = req.app.get('io');
+      const queueType = await QueueTypeModel.findById(queueTypeId);
+      if (io && queueType) {
+        io.to(`queue:${queueType.queue_id}`).emit('token:undone', { member });
+      }
+
+      res.json({ message: 'Serve undone - member moved back to waiting', member });
     } catch (error) {
       next(error);
     }

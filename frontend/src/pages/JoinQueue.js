@@ -24,6 +24,9 @@ const JoinQueue = () => {
   const [formData, setFormData] = useState({ name: '', email: '', phone: '' });
   const [error, setError] = useState('');
   const [member, setMember] = useState(null);
+  const [customFields, setCustomFields] = useState([]);
+  const [customData, setCustomData] = useState({});
+  const [joinRequirements, setJoinRequirements] = useState(null);
   const [skipModal, setSkipModal] = useState(false);
   const [skipPosition, setSkipPosition] = useState('');
   const [leaveConfirm, setLeaveConfirm] = useState(false);
@@ -80,6 +83,21 @@ const JoinQueue = () => {
   useEffect(() => {
     fetchPublicInfo();
   }, [fetchPublicInfo]);
+
+  useEffect(() => {
+    const loadJoinRequirements = async () => {
+      if (!queue) return;
+      try {
+        const { queueSettingsAPI } = await import('../services/api');
+        const res = await queueSettingsAPI.checkJoinRequirements(queue.id, { name: '', email: '', phone: '' });
+        if (res.data.customFields && res.data.customFields.length > 0) {
+          setCustomFields(res.data.customFields);
+        }
+        setJoinRequirements(res.data);
+      } catch (e) { /* optional settings not configured */ }
+    };
+    loadJoinRequirements();
+  }, [queue]);
 
   useEffect(() => {
     if (member && step === STEPS.TOKEN) {
@@ -203,13 +221,14 @@ const JoinQueue = () => {
           name: formData.name,
           email: formData.email,
           phone: formData.phone,
+          customData,
         });
       } else {
-        response = await queueAPI.joinQueue(publicCode, {
-          queueTypeId: selectedSub.id || selectedSub.publicCode,
+        response = await queueAPI.joinBySubCode(selectedSub.publicCode, {
           name: formData.name,
           email: formData.email,
           phone: formData.phone,
+          customData,
         });
       }
       const memberData = response.data.member;
@@ -565,6 +584,11 @@ const JoinQueue = () => {
                         Change
                       </button>
                     </div>
+                    {joinRequirements?.settings?.welcome_message && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                        <p className="text-sm text-blue-800">{joinRequirements.settings.welcome_message}</p>
+                      </div>
+                    )}
                     <div className="grid grid-cols-3 gap-3 text-center">
                       <div>
                         <div className="text-lg font-bold text-gray-900">#{liveStats?.currentlyServing || '-'}</div>
@@ -600,6 +624,40 @@ const JoinQueue = () => {
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900"
                   />
+                  {customFields.map((field) => (
+                    <div key={field.id}>
+                      {field.field_type === 'dropdown' ? (
+                        <select
+                          value={customData[field.field_name] || ''}
+                          onChange={(e) => setCustomData({ ...customData, [field.field_name]: e.target.value })}
+                          className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900"
+                        >
+                          <option value="">{field.field_name}{field.required ? ' *' : ''}</option>
+                          {(field.field_options || []).map((opt) => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
+                        </select>
+                      ) : field.field_type === 'checkbox' ? (
+                        <label className="flex items-center gap-2 py-3 text-sm text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={customData[field.field_name] || false}
+                            onChange={(e) => setCustomData({ ...customData, [field.field_name]: e.target.checked })}
+                            className="rounded"
+                          />
+                          {field.field_name}{field.required ? ' *' : ''}
+                        </label>
+                      ) : (
+                        <input
+                          type={field.field_type}
+                          placeholder={field.field_name + (field.required ? ' *' : '')}
+                          value={customData[field.field_name] || ''}
+                          onChange={(e) => setCustomData({ ...customData, [field.field_name]: e.target.value })}
+                          className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900"
+                        />
+                      )}
+                    </div>
+                  ))}
                   <input
                     type="email"
                     placeholder="Email (optional)"
