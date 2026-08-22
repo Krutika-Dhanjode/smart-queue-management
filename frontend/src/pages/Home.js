@@ -4,13 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { queueAPI } from '../services/api';
 import { QRCodeSVG } from 'qrcode.react';
 
-const getBaseUrl = () => {
-  const host = window.location.hostname;
-  if (host === 'localhost' || host === '127.0.0.1') {
-    return window.location.origin;
-  }
-  return `${window.location.protocol}//${host}:${window.location.port || (window.location.protocol === 'https:' ? '443' : '3000')}`;
-};
+const getBaseUrl = () => window.location.origin;
 
 const Home = () => {
   const { user } = useAuth();
@@ -18,30 +12,15 @@ const Home = () => {
   const [queues, setQueues] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedQR, setSelectedQR] = useState(null);
-  const [networkIP, setNetworkIP] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   useEffect(() => {
     if (user) {
       fetchQueues();
     }
-    detectIP();
   }, [user]);
 
-  const detectIP = async () => {
-    try {
-      const res = await fetch('https://api.ipify.org?format=json');
-      const data = await res.json();
-      setNetworkIP(data.ip);
-    } catch {
-      setNetworkIP(window.location.hostname);
-    }
-  };
-
-  const getJoinUrl = (code) => {
-    const base = networkIP ? `${window.location.protocol}//${networkIP}:3000` : getBaseUrl();
-    return `${base}/join-sub/${code}`;
-  };
+  const getJoinUrl = (code) => `${getBaseUrl()}/join-sub/${code}`;
 
   const fetchQueues = async () => {
     try {

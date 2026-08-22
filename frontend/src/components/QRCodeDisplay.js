@@ -1,26 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 
+const getBaseUrl = () => window.location.origin;
+
 const QRCodeDisplay = ({ queue, onComplete, onGoToAdmin }) => {
-  const [networkIP, setNetworkIP] = useState('');
-
-  useEffect(() => {
-    const detectIP = async () => {
-      try {
-        const res = await fetch('https://api.ipify.org?format=json');
-        const data = await res.json();
-        setNetworkIP(data.ip);
-      } catch {
-        setNetworkIP(window.location.hostname);
-      }
-    };
-    detectIP();
-  }, []);
-
-  const getBaseUrl = () => {
-    return networkIP ? `${window.location.protocol}//${networkIP}:3000` : window.location.origin;
-  };
-
   const copySubLink = (code) => {
     navigator.clipboard.writeText(`${getBaseUrl()}/join-sub/${code}`);
     alert('Link copied!');
