@@ -74,6 +74,7 @@ export const queueAPI = {
   skipSelf: (memberId, data) => api.post(`/queues/member/${memberId}/skip-self`, data),
   getMemberStatus: (memberId) => api.get(`/queues/member/${memberId}/status`),
   addSubQueue: (queueId, data) => api.post(`/queues/${queueId}/sub-queues`, data),
+  deleteQueue: (queueId) => api.delete(`/queues/${queueId}`),
 };
 
 export const queueSettingsAPI = {

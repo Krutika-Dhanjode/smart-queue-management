@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { queueAPI } from '../services/api';
 
@@ -8,7 +8,6 @@ const GetIntoQueue = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  const fileInputRef = useRef(null);
 
   const handleCodeSubmit = async (e) => {
     e.preventDefault();

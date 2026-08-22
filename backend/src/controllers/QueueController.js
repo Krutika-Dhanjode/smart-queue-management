@@ -308,6 +308,23 @@ class QueueController {
     }
   }
 
+  async deleteQueue(req, res, next) {
+    try {
+      const { queueId } = req.params;
+      const queue = await QueueModel.findById(queueId);
+      if (!queue) {
+        return res.status(404).json({ error: 'Queue not found' });
+      }
+      if (queue.created_by !== req.user.id) {
+        return res.status(403).json({ error: 'Not authorized' });
+      }
+      await QueueModel.delete(queueId);
+      res.json({ message: 'Queue deleted successfully' });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getAnalytics(req, res, next) {
     try {
       const { queueTypeId } = req.params;

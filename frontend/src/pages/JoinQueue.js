@@ -99,6 +99,25 @@ const JoinQueue = () => {
     loadJoinRequirements();
   }, [queue]);
 
+  const refreshMemberStatus = useCallback(async () => {
+    if (!member?.id) return;
+    try {
+      const response = await queueAPI.getMemberStatus(member.id);
+      const data = response.data;
+      setMember(prev => ({
+        ...prev,
+        status: data.member.status,
+        token_number: data.member.token_number,
+      }));
+      setLiveStats(data.liveStats);
+      if (data.queue?.status) {
+        setQueue(prev => ({ ...prev, status: data.queue.status }));
+      }
+    } catch (err) {
+      console.error('Failed to refresh status');
+    }
+  }, [member?.id]);
+
   useEffect(() => {
     if (member && step === STEPS.TOKEN) {
       connectSocket();
@@ -167,33 +186,14 @@ const JoinQueue = () => {
         };
       }
     }
-  }, [member?.id, step, queue?.id]);
+  }, [member, step, queue, refreshMemberStatus]);
 
   useEffect(() => {
     if (step === STEPS.TOKEN && member) {
       refreshInterval.current = setInterval(refreshMemberStatus, 10000);
       return () => clearInterval(refreshInterval.current);
     }
-  }, [step, member?.id]);
-
-  const refreshMemberStatus = async () => {
-    if (!member?.id) return;
-    try {
-      const response = await queueAPI.getMemberStatus(member.id);
-      const data = response.data;
-      setMember(prev => ({
-        ...prev,
-        status: data.member.status,
-        token_number: data.member.token_number,
-      }));
-      setLiveStats(data.liveStats);
-      if (data.queue?.status) {
-        setQueue(prev => ({ ...prev, status: data.queue.status }));
-      }
-    } catch (err) {
-      console.error('Failed to refresh status');
-    }
-  };
+  }, [step, member, refreshMemberStatus]);
 
   const handleSelectSub = (sub) => {
     setSelectedSub(sub);

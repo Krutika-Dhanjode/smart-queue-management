@@ -4,7 +4,6 @@ import { queueAPI, analyticsAPI } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { connectSocket, joinQueueRoom, leaveQueueRoom, getSocket } from '../services/socket';
 import QueueMemberList from '../components/QueueMemberList';
-import CompletedList from '../components/CompletedList';
 import RejectedList from '../components/RejectedList';
 import AnalyticsPanel from '../components/AnalyticsPanel';
 import QRCodeDisplay from '../components/QRCodeDisplay';

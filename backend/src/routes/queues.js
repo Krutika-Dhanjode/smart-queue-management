@@ -32,6 +32,7 @@ router.post('/member/:memberId/leave', QueueController.leaveQueue);
 router.post('/:queueId/break', authenticate, QueueController.startBreak);
 router.post('/:queueId/resume', authenticate, QueueController.endBreak);
 router.post('/:queueId/end', authenticate, QueueController.endQueue);
+router.delete('/:queueId', authenticate, QueueController.deleteQueue);
 
 router.get('/:queueTypeId/analytics', authenticate, QueueController.getAnalytics);
 router.get('/:queueId/analytics/all', authenticate, QueueController.getQueueAnalytics);

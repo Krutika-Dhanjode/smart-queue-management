@@ -104,6 +104,17 @@ class QueueModel {
     );
     return result.rows[0];
   }
+
+  static async delete(id) {
+    await query('DELETE FROM queue_members WHERE queue_type_id IN (SELECT id FROM queue_types WHERE queue_id = $1)', [id]);
+    await query('DELETE FROM queue_types WHERE queue_id = $1', [id]);
+    await query('DELETE FROM queue_settings WHERE queue_id = $1', [id]);
+    await query('DELETE FROM queue_custom_fields WHERE queue_id = $1', [id]);
+    await query('DELETE FROM document_requirements WHERE queue_id = $1', [id]);
+    await query('DELETE FROM eligibility_files WHERE queue_id = $1', [id]);
+    await query('DELETE FROM eligibility_records WHERE queue_id = $1', [id]);
+    await query('DELETE FROM queues WHERE id = $1', [id]);
+  }
 }
 
 module.exports = QueueModel;
