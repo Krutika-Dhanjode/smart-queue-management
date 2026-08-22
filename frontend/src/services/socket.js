@@ -1,6 +1,6 @@
 import { io } from 'socket.io-client';
 
-const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || process.env.REACT_APP_API_URL?.replace('/api', '') || window.location.origin;
+const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'https://smart-queue-management-1-88d7.onrender.com';
 
 let socket = null;
 
