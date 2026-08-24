@@ -5,6 +5,7 @@ let redis = null;
 const redisUrl = config.redis.url;
 
 if (redisUrl && redisUrl !== 'redis://localhost:6379') {
+  const isTLS = redisUrl.startsWith('rediss://');
   redis = new Redis(redisUrl, {
     maxRetriesPerRequest: 3,
     retryStrategy(times) {
@@ -12,6 +13,7 @@ if (redisUrl && redisUrl !== 'redis://localhost:6379') {
       return delay;
     },
     lazyConnect: true,
+    ...(isTLS && { tls: { rejectUnauthorized: false } }),
   });
 
   redis.on('error', (err) => {

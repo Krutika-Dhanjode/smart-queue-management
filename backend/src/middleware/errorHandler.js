@@ -49,7 +49,8 @@ const errorHandler = (err, req, res, next) => {
     return res.status(400).json({ error: err.message });
   }
 
-  return res.status(500).json({ error: err.message || 'Internal server error' });
+  const detail = err.message || err.detail || err.routine || 'Internal server error';
+  return res.status(500).json({ error: detail });
 };
 
 module.exports = errorHandler;
