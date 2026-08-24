@@ -63,10 +63,10 @@ app.use('/api/predictions', require('./routes/predictions'));
 app.get('/api/health', async (req, res) => {
   try {
     const { query } = require('./config/database');
-    await query('SELECT 1');
-    res.json({ status: 'ok', db: 'connected', timestamp: new Date().toISOString() });
+    const result = await query('SELECT NOW()');
+    res.json({ status: 'ok', db: 'connected', time: result.rows[0].now, timestamp: new Date().toISOString() });
   } catch (err) {
-    res.status(500).json({ status: 'error', db: err.message, timestamp: new Date().toISOString() });
+    res.status(500).json({ status: 'error', db: err.message, dbCode: err.code, dbDetail: err.detail, timestamp: new Date().toISOString() });
   }
 });
 
