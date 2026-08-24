@@ -60,8 +60,14 @@ app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/predictions', require('./routes/predictions'));
 
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/api/health', async (req, res) => {
+  try {
+    const { query } = require('./config/database');
+    await query('SELECT 1');
+    res.json({ status: 'ok', db: 'connected', timestamp: new Date().toISOString() });
+  } catch (err) {
+    res.status(500).json({ status: 'error', db: err.message, timestamp: new Date().toISOString() });
+  }
 });
 
 app.use(errorHandler);
