@@ -32,15 +32,9 @@ class AuthService {
     const passwordHash = await bcrypt.hash(password, 12);
     const user = await UserModel.create({ name, email, phone, passwordHash, role });
 
-    const otp = this.generateOTP();
-    await OTPModel.create(user.id, otp);
-    console.log(`[OTP] ${email} => ${otp}`);
+    await UserModel.updateEmailVerified(user.id, true);
 
-    if (config.nodeEnv !== 'test') {
-      await this.sendOTPEmail(email, otp, name);
-    }
-
-    return { user, otpSent: true };
+    return { user, otpSent: false };
   }
 
   async verifyOTP(userId, otpCode) {
