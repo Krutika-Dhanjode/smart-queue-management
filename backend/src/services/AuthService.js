@@ -7,15 +7,20 @@ const nodemailer = require('nodemailer');
 
 class AuthService {
   constructor() {
-    this.transporter = nodemailer.createTransport({
-      host: config.smtp.host,
-      port: config.smtp.port,
-      secure: config.smtp.port === 465,
-      auth: {
-        user: config.smtp.user,
-        pass: config.smtp.pass,
-      },
-    });
+    if (config.smtp.host && config.smtp.user && config.smtp.pass) {
+      this.transporter = nodemailer.createTransport({
+        host: config.smtp.host,
+        port: config.smtp.port,
+        secure: config.smtp.port === 465,
+        auth: {
+          user: config.smtp.user,
+          pass: config.smtp.pass,
+        },
+      });
+    } else {
+      console.warn('SMTP not configured, emails will not be sent');
+      this.transporter = null;
+    }
   }
 
   async register({ name, email, phone, password, role = 'USER' }) {
@@ -135,7 +140,11 @@ class AuthService {
     };
 
     try {
-      await this.transporter.sendMail(mailOptions);
+      if (this.transporter) {
+        await this.transporter.sendMail(mailOptions);
+      } else {
+        console.log(`[OTP] ${email} => ${otp} (email not sent - SMTP not configured)`);
+      }
     } catch (error) {
       console.error('Failed to send OTP email:', error.message);
     }

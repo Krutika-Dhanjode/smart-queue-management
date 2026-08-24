@@ -1,55 +1,53 @@
 const errorHandler = (err, req, res, next) => {
-  console.error('Error:', err.message);
+  const msg = err.message || '';
+  const detail = msg || err.detail || err.routine || err.code || 'Internal server error';
+  console.error('Error:', detail);
   console.error('Stack:', err.stack);
 
   if (err.name === 'ValidationError') {
-    return res.status(400).json({
-      error: 'Validation failed',
-      details: err.details,
-    });
+    return res.status(400).json({ error: 'Validation failed', details: err.details });
   }
 
-  if (err.name === 'UnauthorizedError' || err.message === 'Invalid credentials') {
+  if (err.name === 'UnauthorizedError' || msg === 'Invalid credentials') {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
 
-  if (err.message === 'Insufficient permissions') {
+  if (msg === 'Insufficient permissions') {
     return res.status(403).json({ error: 'Insufficient permissions' });
   }
 
-  if (err.message === 'Queue not found') {
+  if (msg === 'Queue not found') {
     return res.status(404).json({ error: 'Queue not found' });
   }
 
-  if (err.message === 'Member not found') {
+  if (msg === 'Member not found') {
     return res.status(404).json({ error: 'Member not found' });
   }
 
-  if (err.message === 'Queue is closed') {
+  if (msg === 'Queue is closed') {
     return res.status(400).json({ error: 'Queue is closed' });
   }
 
-  if (err.message === 'Queue is full') {
+  if (msg === 'Queue is full') {
     return res.status(400).json({ error: 'Queue is full' });
   }
 
-  if (err.message === 'Sub-queue is full') {
+  if (msg === 'Sub-queue is full') {
     return res.status(400).json({ error: 'Sub-queue is full' });
   }
 
-  if (err.message === 'You are already in this queue') {
+  if (msg === 'You are already in this queue') {
     return res.status(409).json({ error: 'You are already in this queue' });
   }
 
-  if (err.message === 'Email already registered') {
+  if (msg === 'Email already registered') {
     return res.status(409).json({ error: 'Email already registered' });
   }
 
-  if (err.message.includes('OTP')) {
-    return res.status(400).json({ error: err.message });
+  if (msg.includes('OTP')) {
+    return res.status(400).json({ error: msg });
   }
 
-  const detail = err.message || err.detail || err.routine || 'Internal server error';
   return res.status(500).json({ error: detail });
 };
 
