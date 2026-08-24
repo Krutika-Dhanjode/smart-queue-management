@@ -1,22 +1,32 @@
 const Redis = require('ioredis');
 const config = require('./index');
 
-const redis = new Redis(config.redis.url, {
-  maxRetriesPerRequest: 3,
-  retryStrategy(times) {
-    const delay = Math.min(times * 50, 2000);
-    return delay;
-  },
-});
+let redis = null;
+const redisUrl = config.redis.url;
 
-redis.on('error', (err) => {
-  console.error('Redis connection error:', err.message);
-});
+if (redisUrl && redisUrl !== 'redis://localhost:6379') {
+  redis = new Redis(redisUrl, {
+    maxRetriesPerRequest: 3,
+    retryStrategy(times) {
+      const delay = Math.min(times * 50, 2000);
+      return delay;
+    },
+    lazyConnect: true,
+  });
 
-redis.on('connect', () => {
-  console.log('Redis connected');
-});
+  redis.on('error', (err) => {
+    console.error('Redis connection error:', err.message);
+  });
+
+  redis.on('connect', () => {
+    console.log('Redis connected');
+  });
+
+  redis.connect().catch(() => {});
+} else {
+  console.log('No Redis URL configured, skipping Redis connection');
+}
 
 const getRedis = () => redis;
 
-module.exports = { redis, getRedis };
+module.exports = { getRedis };
