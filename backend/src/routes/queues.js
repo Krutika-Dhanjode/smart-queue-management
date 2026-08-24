@@ -11,13 +11,14 @@ router.post('/sub-admin-access', QueueController.joinBySubAdminCode);
 
 router.get('/public/sub/:subCode', QueueController.getPublicSubQueueInfo);
 router.get('/public/:publicCode', QueueController.getPublicQueueInfo);
-router.post('/member/:memberId/skip-self', QueueController.skipSelf);
-router.get('/member/:memberId/status', QueueController.getMemberStatus);
-router.get('/member/:memberId/position', QueueController.getMemberPosition);
+router.get('/member/mine', authenticate, QueueController.getMyMemberships);
+router.post('/member/:memberId/skip-self', authenticate, QueueController.skipSelf);
+router.get('/member/:memberId/status', authenticate, QueueController.getMemberStatus);
+router.get('/member/:memberId/position', authenticate, QueueController.getMemberPosition);
 
 router.get('/sub/:subCode', QueueController.getSubQueueByCode);
-router.post('/join-sub/:subCode', QueueController.joinBySubCode);
-router.post('/join/:publicCode', QueueController.joinQueue);
+router.post('/join-sub/:subCode', authenticate, QueueController.joinBySubCode);
+router.post('/join/:publicCode', authenticate, QueueController.joinQueue);
 
 router.get('/:queueId/types', QueueController.getQueueWithTypes);
 router.get('/:queueTypeId/members', QueueController.getMembersByType);
@@ -27,7 +28,7 @@ router.post('/:queueTypeId/members/:memberId/complete', authenticate, QueueContr
 router.post('/:queueTypeId/members/:memberId/undo-serve', authenticate, QueueController.undoServe);
 router.post('/:queueTypeId/members/:memberId/skip', authenticate, QueueController.skipToken);
 router.post('/:queueTypeId/members/:memberId/remove', authenticate, QueueController.removeToken);
-router.post('/member/:memberId/leave', QueueController.leaveQueue);
+router.post('/member/:memberId/leave', authenticate, QueueController.leaveQueue);
 
 router.post('/:queueId/break', authenticate, QueueController.startBreak);
 router.post('/:queueId/resume', authenticate, QueueController.endBreak);

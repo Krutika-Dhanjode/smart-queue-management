@@ -102,6 +102,15 @@ class QueueController {
     }
   }
 
+  async getMyMemberships(req, res, next) {
+    try {
+      const memberships = await QueueMemberModel.findByUserId(req.user.id);
+      res.json({ memberships });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async joinQueue(req, res, next) {
     try {
       const { publicCode } = req.params;
@@ -113,7 +122,7 @@ class QueueController {
         name,
         email,
         phone,
-        userId: req.user?.id,
+        userId: req.user.id,
         priority,
       });
 
@@ -141,6 +150,9 @@ class QueueController {
       const member = await QueueMemberModel.findById(memberId);
       if (!member) {
         return res.status(404).json({ error: 'Member not found' });
+      }
+      if (member.user_id !== req.user.id) {
+        return res.status(403).json({ error: 'Not authorized to view this membership' });
       }
       const queueType = await QueueTypeModel.findById(member.queue_type_id);
       const activeMembers = await QueueMemberModel.findActiveByQueueType(member.queue_type_id);
@@ -245,6 +257,13 @@ class QueueController {
   async leaveQueue(req, res, next) {
     try {
       const { memberId } = req.params;
+      const memberToLeave = await QueueMemberModel.findById(memberId);
+      if (!memberToLeave) {
+        return res.status(404).json({ error: 'Member not found' });
+      }
+      if (memberToLeave.user_id !== req.user.id) {
+        return res.status(403).json({ error: 'Not authorized to leave this queue' });
+      }
       const member = await QueueService.leaveQueue(memberId, req.user?.id);
 
       const io = req.app.get('io');
@@ -566,6 +585,9 @@ class QueueController {
       if (!member) {
         return res.status(404).json({ error: 'Member not found' });
       }
+      if (member.user_id !== req.user.id) {
+        return res.status(403).json({ error: 'Not authorized to skip this membership' });
+      }
       if (member.status !== 'WAITING') {
         return res.status(400).json({ error: 'Can only skip while WAITING' });
       }
@@ -625,6 +647,9 @@ class QueueController {
       const member = await QueueMemberModel.findById(memberId);
       if (!member) {
         return res.status(404).json({ error: 'Member not found' });
+      }
+      if (member.user_id !== req.user.id) {
+        return res.status(403).json({ error: 'Not authorized to view this membership' });
       }
       const queueType = await QueueTypeModel.findById(member.queue_type_id);
       const queue = await QueueModel.findById(queueType?.queue_id);

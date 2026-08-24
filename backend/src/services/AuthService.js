@@ -31,10 +31,16 @@ class AuthService {
 
     const passwordHash = await bcrypt.hash(password, 12);
     const user = await UserModel.create({ name, email, phone, passwordHash, role });
+    const otp = this.generateOTP();
 
-    await UserModel.updateEmailVerified(user.id, true);
+    await OTPModel.invalidatePrevious(user.id);
+    await OTPModel.create(user.id, otp);
 
-    return { user, otpSent: false };
+    if (config.nodeEnv !== 'test') {
+      await this.sendOTPEmail(user.email, otp, user.name);
+    }
+
+    return { user: this.sanitizeUser(user), userId: user.id, otpSent: true, emailVerified: false };
   }
 
   async verifyOTP(userId, otpCode) {
@@ -64,11 +70,7 @@ class AuthService {
     }
 
     if (!user.email_verified) {
-      const otp = this.generateOTP();
-      await OTPModel.invalidatePrevious(user.id);
-      await OTPModel.create(user.id, otp);
-      console.log(`[OTP] ${email} => ${otp}`);
-      return { user, emailVerified: false, otpSent: true };
+      throw new Error('Email not verified. Please complete registration verification first.');
     }
 
     const token = this.generateToken(user);

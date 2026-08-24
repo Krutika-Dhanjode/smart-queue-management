@@ -6,17 +6,11 @@ class AuthController {
     try {
       const { name, email, phone, password } = req.body;
       const result = await AuthService.register({ name, email, phone, password, role: 'USER' });
-      const token = AuthService.generateToken(result.user);
-      res.cookie('token', token, {
-        httpOnly: true,
-        secure: config.nodeEnv === 'production',
-        sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      });
       res.status(201).json({
-        message: 'Registration successful',
-        token,
-        user: AuthService.sanitizeUser(result.user),
+        message: 'Registration successful. Please verify your email.',
+        userId: result.userId,
+        emailVerified: result.emailVerified,
+        otpSent: result.otpSent,
       });
     } catch (error) {
       next(error);
@@ -27,17 +21,11 @@ class AuthController {
     try {
       const { name, email, phone, password } = req.body;
       const result = await AuthService.register({ name, email, phone, password, role: 'ADMIN' });
-      const token = AuthService.generateToken(result.user);
-      res.cookie('token', token, {
-        httpOnly: true,
-        secure: config.nodeEnv === 'production',
-        sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      });
       res.status(201).json({
-        message: 'Admin registration successful',
-        token,
-        user: AuthService.sanitizeUser(result.user),
+        message: 'Admin registration successful. Please verify your email.',
+        userId: result.userId,
+        emailVerified: result.emailVerified,
+        otpSent: result.otpSent,
       });
     } catch (error) {
       next(error);
@@ -83,22 +71,6 @@ class AuthController {
     try {
       const { email, password } = req.body;
       const result = await AuthService.login({ email, password });
-
-      if (!result.emailVerified) {
-        const token = result.token;
-        const user = result.user;
-        res.cookie('token', token, {
-          httpOnly: true,
-          secure: config.nodeEnv === 'production',
-          sameSite: 'lax',
-          maxAge: 7 * 24 * 60 * 60 * 1000,
-        });
-        return res.json({
-          message: 'Login successful',
-          token,
-          user,
-        });
-      }
 
       res.cookie('token', result.token, {
         httpOnly: true,

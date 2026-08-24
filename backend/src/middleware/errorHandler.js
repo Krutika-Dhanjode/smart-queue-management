@@ -16,6 +16,10 @@ const errorHandler = (err, req, res, next) => {
     return res.status(403).json({ error: 'Insufficient permissions' });
   }
 
+  if (msg === 'Email not verified. Please complete registration verification first.') {
+    return res.status(403).json({ error: msg });
+  }
+
   if (msg === 'Queue not found') {
     return res.status(404).json({ error: 'Queue not found' });
   }

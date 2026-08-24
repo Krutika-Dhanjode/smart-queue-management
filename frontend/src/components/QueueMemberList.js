@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const QueueMemberList = ({ members, onServe, onComplete, onSkip, onRemove, disabled }) => {
+const QueueMemberList = ({ members, onComplete, onSkip, onRemove, disabled }) => {
   const [expandedId, setExpandedId] = useState(null);
   const [confirmRemove, setConfirmRemove] = useState(null);
 
@@ -63,7 +63,6 @@ const QueueMemberList = ({ members, onServe, onComplete, onSkip, onRemove, disab
                 <div className="text-sm font-mono text-gray-900">#{member.token_number}</div>
                 <div><span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(member.status)}`}>{member.status}</span></div>
                 <div className="flex gap-1 justify-end">
-                  <button onClick={() => onServe(member.id)} disabled={disabled} className="px-2.5 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed">Serve</button>
                   <button onClick={() => onComplete(member.id)} disabled={disabled} className="px-2.5 py-1 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed">Done</button>
                   <button onClick={() => onSkip(member.id)} disabled={disabled} className="px-2.5 py-1 border border-gray-300 rounded text-xs font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">Skip</button>
                   <button onClick={() => setConfirmRemove(member.id)} disabled={disabled} className="px-2.5 py-1 border border-red-200 text-red-600 rounded text-xs font-medium hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed">Remove</button>
@@ -106,7 +105,6 @@ const QueueMemberList = ({ members, onServe, onComplete, onSkip, onRemove, disab
                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(member.status)}`}>{member.status}</span>
               </div>
               <div className="flex gap-1.5">
-                <button onClick={() => onServe(member.id)} disabled={disabled} className="flex-1 py-1.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed">Serve</button>
                 <button onClick={() => onComplete(member.id)} disabled={disabled} className="flex-1 py-1.5 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed">Done</button>
                 <button onClick={() => onSkip(member.id)} disabled={disabled} className="flex-1 py-1.5 border border-gray-300 rounded text-xs font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">Skip</button>
                 <button onClick={() => setConfirmRemove(member.id)} disabled={disabled} className="flex-1 py-1.5 border border-red-200 text-red-600 rounded text-xs font-medium hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed">Remove</button>

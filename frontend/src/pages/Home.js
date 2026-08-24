@@ -13,10 +13,15 @@ const Home = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedQR, setSelectedQR] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [memberships, setMemberships] = useState([]);
 
   useEffect(() => {
     if (user) {
-      fetchQueues();
+      if (user.role === 'ADMIN') {
+        fetchQueues();
+      } else {
+        fetchMemberships();
+      }
     }
   }, [user]);
 
@@ -31,9 +36,20 @@ const Home = () => {
     }
   };
 
+  const fetchMemberships = async () => {
+    try {
+      const response = await queueAPI.getMyMemberships();
+      setMemberships(response.data.memberships || []);
+    } catch (err) {
+      console.error('Failed to fetch queue memberships');
+    }
+  };
+
   const handleCreateQueue = () => {
-    if (user) {
+    if (user?.role === 'ADMIN') {
       navigate('/admin');
+    } else if (user) {
+      navigate('/get-into-queue');
     } else {
       navigate('/register');
     }
@@ -57,7 +73,7 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-white flex">
-      {user && (
+      {user?.role === 'ADMIN' && (
         <>
           <button
             onClick={() => setSidebarOpen(true)}
@@ -296,6 +312,47 @@ const Home = () => {
               Join a digital queue, track your position in real time, and reduce unnecessary waiting.
             </p>
           </div>
+
+          {user && user.role !== 'ADMIN' && (
+            <section className="max-w-2xl mx-auto mb-12">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900">Your queues</h3>
+                  <p className="text-sm text-gray-500 mt-1">Track every queue you have joined.</p>
+                </div>
+                <Link to="/get-into-queue" className="text-sm font-medium text-gray-900 hover:text-gray-600">
+                  Join another
+                </Link>
+              </div>
+              {memberships.length > 0 ? (
+                <div className="space-y-3">
+                  {memberships.map((membership) => (
+                    <Link
+                      key={membership.id}
+                      to={`/queue/${membership.id}`}
+                      className="block border border-gray-200 rounded-xl p-4 hover:border-gray-900 transition-colors"
+                    >
+                      <div className="flex justify-between items-start gap-4">
+                        <div>
+                          <h4 className="font-medium text-gray-900">{membership.queue_name}</h4>
+                          <p className="text-sm text-gray-600">{membership.queue_type_name}</p>
+                        </div>
+                        <span className="text-xs font-medium text-gray-600">{membership.status}</span>
+                      </div>
+                      <div className="mt-3 flex justify-between text-sm text-gray-500">
+                        <span>Token #{membership.token_number}</span>
+                        <span>{membership.queue_status}</span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="border border-dashed border-gray-300 rounded-xl p-6 text-center text-sm text-gray-500">
+                  You have not joined a queue yet.
+                </div>
+              )}
+            </section>
+          )}
 
           <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
             <button

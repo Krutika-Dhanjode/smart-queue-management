@@ -12,6 +12,7 @@ const VerifyOTP = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const userId = location.state?.userId || localStorage.getItem('pendingUserId');
+  const returnTo = location.state?.returnTo || localStorage.getItem('pendingReturnTo') || '/';
 
   const handleChange = (index, value) => {
     if (value.length > 1) return;
@@ -37,10 +38,11 @@ const VerifyOTP = () => {
     try {
       const result = await verifyOTP(userId, otp.join(''));
       localStorage.removeItem('pendingUserId');
+      localStorage.removeItem('pendingReturnTo');
       if (result.user?.role === 'ADMIN') {
         navigate('/admin');
       } else {
-        navigate('/');
+        navigate(returnTo);
       }
     } catch (err) {
       setError(err.response?.data?.error || 'Invalid OTP');

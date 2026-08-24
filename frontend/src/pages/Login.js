@@ -18,9 +18,7 @@ const Login = () => {
     try {
       const result = await login(email, password);
       if (result.emailVerified === false) {
-        setError('Please verify your email first. Check your inbox for the OTP code, then register again.');
-        setLoading(false);
-        return;
+        setError('Please verify your email from the registration OTP before signing in.');
       } else if (result.role === 'ADMIN') {
         navigate('/admin');
       } else {

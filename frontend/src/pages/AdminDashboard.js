@@ -145,15 +145,6 @@ const AdminDashboard = () => {
     }
   }, [selectedQueue, selectedType]);
 
-  const handleServe = async (memberId) => {
-    try {
-      await queueAPI.serveToken(selectedType.id, memberId);
-      fetchMembers();
-    } catch (err) {
-      console.error('Failed to serve token');
-    }
-  };
-
   const handleComplete = async (memberId) => {
     try {
       const member = members.find(m => m.id === memberId);
@@ -446,7 +437,6 @@ const AdminDashboard = () => {
 
             <QueueMemberList
               members={members}
-              onServe={handleServe}
               onComplete={handleComplete}
               onSkip={handleSkip}
               onRemove={handleRemove}

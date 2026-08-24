@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { queueAPI } from '../services/api';
 import { connectSocket, joinQueueRoom, leaveQueueRoom, getSocket } from '../services/socket';
+import { useAuth } from '../hooks/useAuth';
 
 const STEPS = {
   LOADING: 'LOADING',
@@ -16,6 +17,7 @@ const STEPS = {
 const JoinQueue = () => {
   const { publicCode, subCode } = useParams();
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const [step, setStep] = useState(STEPS.LOADING);
   const [queue, setQueue] = useState(null);
   const [subQueues, setSubQueues] = useState([]);
@@ -83,6 +85,15 @@ const JoinQueue = () => {
   useEffect(() => {
     fetchPublicInfo();
   }, [fetchPublicInfo]);
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/register', {
+        replace: true,
+        state: { returnTo: window.location.pathname + window.location.search },
+      });
+    }
+  }, [authLoading, user, navigate]);
 
   useEffect(() => {
     const loadJoinRequirements = async () => {
@@ -208,6 +219,13 @@ const JoinQueue = () => {
   };
 
   const handleJoin = async () => {
+    if (!user) {
+      navigate('/register', {
+        state: { returnTo: window.location.pathname + window.location.search },
+      });
+      return;
+    }
+
     if (!formData.name.trim() || !formData.phone.trim()) {
       setError('Please fill in your name and phone number.');
       return;
@@ -270,7 +288,7 @@ const JoinQueue = () => {
     }
   };
 
-  if (step === STEPS.LOADING) {
+  if (authLoading || !user || step === STEPS.LOADING) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>

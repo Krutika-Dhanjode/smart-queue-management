@@ -34,6 +34,20 @@ class QueueMemberModel {
     return result.rows[0];
   }
 
+  static async findByUserId(userId) {
+    const result = await query(
+      `SELECT qm.*, q.name AS queue_name, q.status AS queue_status,
+              qt.name AS queue_type_name
+       FROM queue_members qm
+       JOIN queue_types qt ON qt.id = qm.queue_type_id
+       JOIN queues q ON q.id = qt.queue_id
+       WHERE qm.user_id = $1
+       ORDER BY qm.created_at DESC`,
+      [userId]
+    );
+    return result.rows;
+  }
+
   static async findActiveByQueueType(queueTypeId) {
     const result = await query(
       `SELECT * FROM queue_members

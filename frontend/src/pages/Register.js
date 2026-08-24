@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 const Register = () => {
@@ -14,6 +14,8 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = location.state?.returnTo || '/';
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -37,7 +39,8 @@ const Register = () => {
         password: formData.password,
       });
       localStorage.setItem('pendingUserId', result.userId);
-      navigate('/verify-otp', { state: { userId: result.userId } });
+      localStorage.setItem('pendingReturnTo', returnTo);
+      navigate('/verify-otp', { state: { userId: result.userId, returnTo } });
     } catch (err) {
       setError(err.response?.data?.error || 'Registration failed');
     } finally {
